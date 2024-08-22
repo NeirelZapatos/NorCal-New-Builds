@@ -1,29 +1,35 @@
 import { useState, useEffect } from 'react'
 import axios from "axios";
 
+const serverPort = 3000;
+
 function App() {
-  const [count, setCount] = useState(0)
-  const [array, setArray] = useState([]);
+  	const [count, setCount] = useState(0)
+  	const [array, setArray] = useState([]);
 
-  const fetchAPI = async () => {
-    const response = await axios.get("http://localhost:8080/api");
-    setArray(response.data.fruits);
-    console.log(response.data.fruits);
-  };
+  	const fetchAPI = async () => {
+		try {
+			const response = await axios.get(`http://localhost:${serverPort}/`);
+			setArray(response.data.houses);
+		} catch (err) {
+			console.log(err);
+		}
+  	};
 
-  useEffect(() => {
-    fetchAPI();
-  }, []);
+  	useEffect(() => {
+    	fetchAPI();
+  	}, []);
 
-  return (
-    <div>
-      {array.map((fruit, index) => 
-        <div key={index}>
-          <p>{fruit}</p>
-        </div>
-      )}
-    </div>
-  )
+  	return (
+    	<div>
+			<button type="button" className="btn btn-primary">Base class</button>
+			{array.map((house, index) => 
+				<div key={index}>
+					<p>{house.address}</p>
+				</div>
+			)}
+    	</div>
+  	)
 }
 
 export default App
