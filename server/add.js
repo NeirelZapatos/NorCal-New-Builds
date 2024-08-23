@@ -113,6 +113,7 @@ async function addWoodside() {
     console.log("Finished adding Woodside Homes");
 }
 
+// gonna need to use pupeteer dynamic web page
 async function addCentury() {
     try {
         const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Woodside Homes'");
@@ -123,7 +124,7 @@ async function addCentury() {
 
         const currentAddresses = new Set();
 
-        const homePromises = $(".century-card").map(async (index, element) =>{
+        const homePromises = $(".century-card").map(async (index, element) => {
             const address = $(element).find(".panel-home__content-description").text().trim();
             currentAddresses.add(address);
 
@@ -148,5 +149,46 @@ async function addCentury() {
     }
     console.log("Finished adding Century Homes");
 }
+
+// gonna need to use pupeteer dynamic web page
+async function addMeritage() {
+    try {
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Meritage Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
+
+        const response = await axios.get("https://www.meritagehomes.com/state/ca/sacramento/search/qmi/1");
+        const $ = cheerio.load(response.data);
+
+        const currentAddresses = new Set();
+
+        const homePromises = $(".community-horizontal").map(async (index, element) => {
+            const locationInfo = $(element).find(".mid p.community--range-mo").text();
+            console.log(locationInfo);
+            // const address = $(element).find(".community--range-mo").text().trim();
+            // currentAddresses.add(address);
+
+            // if (!existingAddresses.has(address)) {
+
+            //     await db.query(`
+            //         INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
+            //         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            //         ["Meritage Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+            //     );
+            // }
+        }).get();
+        
+        await Promise.all(homePromises);
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addMeritage:", err);
+    }
+    console.log("Finished adding Meritage Homes");    
+}
+
+addMeritage();
 
 export { addJmc, addWoodside }
