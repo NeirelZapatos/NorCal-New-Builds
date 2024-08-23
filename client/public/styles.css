@@ -1,0 +1,7 @@
+.bg-light-blue {
+    background-color: rgb(100, 130, 173); /* Light blue color */
+}
+
+.text-bg-dark {
+    background-color: rgb(100, 130, 173) !important;
+}
