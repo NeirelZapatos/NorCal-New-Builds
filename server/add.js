@@ -2,6 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import env from "dotenv";
 import pg from "pg";
+import puppeteer from "puppeteer";
 
 env.config();
 
@@ -66,7 +67,6 @@ async function addJmc() {
     } catch (err) {
         console.error("Error in addJmc:", err);
     }
-    console.log("Finished adding JMC Homes");
 }
 
 async function addWoodside() {
@@ -110,7 +110,69 @@ async function addWoodside() {
     } catch (err) {
         console.log("Error in addWoodside:", err);
     }
-    console.log("Finished adding Woodside Homes");
+}
+
+async function addBeazer() {
+    try {
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Beazer Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
+        const currentAddresses = new Set();
+    
+        const browser = await puppeteer.launch({ 
+            headless: false,
+            defaultViewport: {
+                width: 1280,
+                height: 800
+            }
+        });
+        const page = await browser.newPage();
+    
+        await page.goto("https://www.beazer.com/search-ca-sacramento");
+        await page.waitForSelector('a'); // Wait for any anchor tag to be available
+        await page.evaluate(() => {
+            const links = Array.from(document.querySelectorAll('a'));
+            const quickMoveInsLink = links.find(link => link.textContent.includes('Quick Move-ins'));
+            if (quickMoveInsLink) {
+                quickMoveInsLink.click();
+            }
+        });
+    
+        await page.waitForSelector('div.product-card.card_spec_outer.horizontal');
+    
+        // Step 1: Select all product-cards
+        const houseCards = await page.$$('div.product-card.card_spec_outer.horizontal');
+    
+        // Step 2: Iterate through each product card
+        for (const house of houseCards) {
+            // Step 3: Find the bold element with classes 'bold block uppercase'
+            const statusText = await house.$('b.bold.block.uppercase');
+       
+            // Extract the text content
+            const status = await page.evaluate(element => element.textContent, statusText);
+                
+            if (status === "Now") {
+                const link = await house.$eval('a.red-button.margin-medium', anchor => {
+                    return anchor.href;
+                });
+                const segments = link.split("/");
+                const address = segments[6].replace(/-/g, " ");
+                currentAddresses.add(address);
+
+                if (!existingAddresses.has(address)) {
+                    const city = (await house.$eval('.seriesname', locationText => locationText.textContent)).split("|")[1].trim();
+                    const community = (await house.$eval('.seriesname', locationText => locationText.textContent)).split("|")[0].trim();
+                    const price = (await house.$eval('.font18.no-margin.right-align', priceText => priceText.textContent)).replace(/[^0-9]/g, "").trim();
+                }
+            }
+        }
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addWoodside:", err);
+    }  
 }
 
 // gonna need to use pupeteer dynamic web page
@@ -189,6 +251,6 @@ async function addMeritage() {
     console.log("Finished adding Meritage Homes");    
 }
 
-addMeritage();
+addBeazer();
 
 export { addJmc, addWoodside }
