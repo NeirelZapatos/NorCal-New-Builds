@@ -126,11 +126,11 @@ async function addBeazer() {
         const currentAddresses = new Set();
 
         const homePromises = $(".product-card.card_spec_outer").map(async (index, element) => {
-            const status = $(element).find(".stats .bold.block.uppercase").text().trim();
+            // const status = $(element).find(".stats .bold.block.uppercase").text().trim();
             const address = $(element).find("a").attr("href").split("/")[4].replace(/-/g, " ");
             currentAddresses.add(address);
 
-            if (status === "Now" && !existingAddresses.has(address)) {
+            if (!existingAddresses.has(address)) {
                 const city = $(element).find(".seriesname").text().split("|")[1].split(",")[0].trim();
                 const community = $(element).find(".seriesname").text().split(" | ")[0].trim();
                 const price = $(element).find(".info .font18.no-margin.right-align").text().trim().replace(/[^0-9]/g, "");
@@ -158,14 +158,83 @@ async function addBeazer() {
     }
 }
 
-async function addTripointe() {
+async function addKb() {
+    console.log("Adding Kb");
+    try {
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Kb Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
+
+        const browser = await puppeteer.launch({
+            headless: true,
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            }
+        });
+
+        const page = await browser.newPage();
+        await page.goto("https://www.kbhome.com/move-in-ready?state=california&region=sacramento");
+
+        const currentAddresses = new Set();
     
+        await page.waitForSelector(".community-filters .input-select.room-filter");
+        await page.select(".community-filters .input-select.room-filter", "Available Now");
+
+        let card_number = 12;
+
+        while (card_number === 12) {
+            await page.waitForSelector(".mir-card");
+            const mirCards = await page.$$(".mir-card");
+            card_number = mirCards.length;
+    
+            for (const mirCard of mirCards) {
+                const address = await mirCard.$eval("h2", h2 => h2.textContent.trim());
+                currentAddresses.add(address);
+    
+                if (!existingAddresses.has(address)) {
+                    const houseDetails = await mirCard.$$eval(".font-AvenirNextLTPro-Bold", details => {
+                        return details.map(detail => detail.textContent);
+                    });
+            
+                    const city = await mirCard.$eval("p", p => p.textContent.split("\n")[2].split(",")[0].trim());
+                    const community = await mirCard.$eval("p", p => p.textContent.split("\n")[1].split(",")[0].trim());
+                    const price = await mirCard.$eval(".price", price => price.textContent.replace(/[^0-9]/g, "").trim());
+                    const sqFt = houseDetails[3].replace(/[^0-9]/g, "");
+                    const beds = houseDetails[0];
+                    const baths = houseDetails[1];
+                    const garages = houseDetails[2];
+                    const imgUrl = await mirCard.$eval("img", a => a.src.trim());
+            
+                    await db.query(`
+                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                        ["Kb Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                    );
+                }
+            } 
+
+            await page.click(".next"); 
+        }
+
+        browser.close();
+
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addKb:", err);
+    } 
 }
  
 function addHomes() {
     addJmc();
     addWoodside();
     addBeazer();
+    addKb();
 }
+
+addHomes();
 
 export default addHomes;

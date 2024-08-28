@@ -6,6 +6,7 @@ function Card(props) {
             <div className="card shadow-sm">
                 <img src={props.house.imgurl} alt="house image" />
                 <div className="card-body">
+                    <p className="card-text">Builder: {props.house.builder}</p>
                     <p className="card-text">City: {props.house.city}</p>
                     <p className="card-text">Community: {props.house.community}</p>
                     <p className="card-text">Price: ${props.house.price.toLocaleString()}</p>
