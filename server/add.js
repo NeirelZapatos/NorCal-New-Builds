@@ -227,12 +227,92 @@ async function addKb() {
         console.log("Error in addKb:", err);
     } 
 }
+
+async function addTripointe() {
+    console.log("Adding Tripointe");
+    try { 
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Tripointe Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
+
+        const browser = await puppeteer.launch({
+            headless: true,
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            }
+        });
+
+        const page = await browser.newPage();
+        await page.goto("https://www.tripointehomes.com/find-your-home/ca/sacramento/?type=neighborhoods&refinementList%5Bavailability_status%5D=Move-In%20Ready&refinementList%5Bmove_in_window%5D=1%E2%80%933%20mo.&sortBy=production_homes&refinementList%5Bavailability_status%5D=Move-In%20Ready&refinementList%5Bmove_in_window%5D=1%E2%80%933%20mo.");
+
+        const currentAddresses = new Set();
+
+        await page.waitForSelector('[aria-label="Change search tab to Homes & Floorplans"]');
+        await page.click('[aria-label="Change search tab to Homes & Floorplans"]');
+
+        try {
+            while (true) {
+                let loadButton = await page.waitForSelector("a.btn-solid.btn-solid--apple", { timeout: 1000});
+                const link = await page.$eval("a.btn-solid.btn-solid--apple", a => a.href);
+                await page.goto(link);
+                await page.waitForSelector('[aria-label="Change search tab to Homes & Floorplans"]');
+                await page.click('[aria-label="Change search tab to Homes & Floorplans"]');
+            }
+        } catch (err) {
+            console.log("Loaded all houses for Tripointe Homes")
+        }
+
+        await page.waitForSelector(".tw-uppercase.tw-text-slate.tw-text-xxxs.tw-font-medium.tw-tracking-wide.tw-mb-2");
+        const cards = await page.$$(".tw-animate-fade-in.tw-relative.tw-pb-12.tw-h-full.tw-group");
+
+        for (const card of cards) {
+            const address = await card.$eval("div div div div h4 a", a => a.textContent.trim());
+            currentAddresses.add(address);
+
+            if (!existingAddresses.has(address)) {
+                const houseDetails = await card.$$eval("span.pb-1.tw-text-sm.tw-text-ash.tw-text-center.tw-font-medium", details => {
+                    return details.map(detail => detail.textContent.trim());
+                });
+
+                const city = await card.$eval("span.tw-font-medium.tw-text-sm.tw-text-charcoal.tw-pr-2", span => span.textContent.trim().split(",")[0]);
+                const community = await card.$eval("div div div div h4 a", a => a.href.split("/")[5].replace(/[-]/g, " ").trim());
+                const price = await card.$eval("span.tw-font-medium.tw-text-sm.tw-text-charcoal.tw-pl-2", span => span.textContent.replace(/[^0-9]/g, "").trim());
+                const sqFt = houseDetails[0].replace(/[^0-9]/g, "");
+                const beds = houseDetails[1];
+                const baths = houseDetails[2];
+                const garages = houseDetails[3];
+                const imgUrl = await card.$eval("img", img => img.src.trim());
+
+                try {
+                    await db.query(`
+                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                        ["Tripointe Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                    );
+                } catch {
+                    break;
+                }
+            }
+        }
+
+        browser.close();
+
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addTripointe", err);
+    }
+}
  
 function addHomes() {
     addJmc();
     addWoodside();
     addBeazer();
     addKb();
+    addTripointe();
 }
 
 addHomes();
