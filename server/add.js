@@ -28,8 +28,7 @@ function addHomes() {
     addDrHorton();
 }
 
-// addHomes();
-addDrHorton();
+addHomes();
 
 function delay(time) {
     return new Promise(function(resolve) { 
@@ -190,6 +189,7 @@ async function addBeazer() {
     }
 }
 
+//fix the next button feature. can break
 async function addKb() {
     console.log("Adding Kb");
     try {
@@ -246,7 +246,10 @@ async function addKb() {
                 }
             } 
 
-            await page.click(".next"); 
+            const nextButton = await page.$(".next");
+            if (nextButton) {
+                await page.click(".next"); 
+            }
         }
 
         browser.close();
@@ -440,7 +443,7 @@ async function addDrHorton() {
         const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
 
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             defaultViewport: {
                 width: 1920,
                 height: 1080
@@ -452,32 +455,20 @@ async function addDrHorton() {
 
         const currentAddresses = new Set();
 
-        let nextButtonExists = await page.evaluate(() => {
-            const button = document.querySelector('.pagination__button.pagination__button--next-previous');
-            if (button && button.textContent.trim() === 'Next') {
-              button.click();
-              return true; // Button was clicked
-            }
-            return false; // Button was not found or conditions not met
-        });
-
         let cards = [];
-        do {
+        while (true) {
             await page.waitForSelector(".CoveoResult");
-            cards = cards.concat(await page.$$(".CoveoResult"));
-            console.log(cards);
-            nextButtonExists = await page.evaluate(() => {
-                const button = document.querySelector('.pagination__button.pagination__button--next-previous');
-                if (button && button.textContent.trim() === 'Next') {
-                  button.click();
-                  return true; // Button was clicked
-                }
-                return false; // Button was not found or conditions not met
-            });
-        } while (nextButtonExists)
+            const newCards = await page.$$(".CoveoResult");
+            cards = cards.concat(newCards);
+            const nextButton = await page.$("#btn-next");
+            if (nextButton) {
+                await page.$eval("#btn-next", btn => btn.click());
+            } else {
+                break;
+            }
+        }
 
-        await delay(30000);
-        
+
         let mirLinks = []
         for (const card of cards) {
             const mir = await card.$(".home-info__available-homes");
@@ -494,8 +485,10 @@ async function addDrHorton() {
             const community = await page.$eval(".community-main-info h1", el => el.textContent.trim());
             const city = await page.$eval(".community-secondary-info a", el => el.textContent.split(",")[1].trim());
 
-            await page.waitForSelector(".related-move-in .toggle-item");
             const mirCards = await page.$$(".related-move-in .toggle-item");
+            if (!mirCards) {
+                continue;
+            }
 
             for (const mirCard of mirCards) {
                 const address = await mirCard.$eval(".card-content h3", el => el.textContent.trim());
@@ -506,6 +499,7 @@ async function addDrHorton() {
                     if (price === "") {
                         continue;
                     }
+
                     const houseDetails = await mirCard.$$eval(".card-content p", details => {
                         return details.map(detail => detail.textContent.trim());
                     });
@@ -515,7 +509,7 @@ async function addDrHorton() {
                     } else {
                         detailPos = 0
                     }
-   
+
                     const sqFt = houseDetails[detailPos].split("|")[4].replace(/[^0-9]/g, "").trim();
                     const beds = houseDetails[detailPos].split("|")[0].replace(/[^0-9]/g, "").trim();
                     const baths = houseDetails[detailPos].split("|")[1].replace(/[^0-9.]/g, "").trim();
