@@ -2,8 +2,11 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import env from "dotenv";
 import pg from "pg";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { URL } from "url"; 
+
+puppeteer.use(StealthPlugin());
 
 env.config();
 
@@ -14,6 +17,19 @@ const db = new pg.Pool({
     password: "9kxtEC%M5%^2N92B",
     port: 5432
 });
+
+function addHomes() {
+    addJmc();
+    addWoodside();
+    addBeazer();
+    addKb();
+    addTripointe();
+    addRichmondAmerican();
+    addDrHorton();
+}
+
+// addHomes();
+addDrHorton();
 
 function delay(time) {
     return new Promise(function(resolve) { 
@@ -345,7 +361,7 @@ async function addRichmondAmerican() {
 
         const currentAddresses = new Set();
         
-        await delay(5000);
+        await delay(10000);
 
         await page.waitForSelector(".blz-community-filters-open")
         await page.click(".blz-community-filters-open")
@@ -355,6 +371,8 @@ async function addRichmondAmerican() {
 
         await page.waitForSelector(".filter--header .btn");
         await page.$eval(".filter--header .btn", element => element.click());
+
+        await delay(5000);
 
         await page.waitForSelector(".comm-card__content-wrap");
         const cards = await page.$$(".comm-card__content-wrap");
@@ -415,19 +433,121 @@ async function addRichmondAmerican() {
     }
 }
 
-async function AddDrHorton() {
+async function addDrHorton() {
+    console.log("Adding DrHorton");
+    try { 
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Dr Horton Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
 
-}
- 
-function addHomes() {
-    addJmc();
-    addWoodside();
-    addBeazer();
-    addKb();
-    addTripointe();
-    addRichmondAmerican();
-}
+        const browser = await puppeteer.launch({
+            headless: false,
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            }
+        });
 
-addHomes();
+        const page = await browser.newPage();
+        await page.goto("https://www.drhorton.com/california/sacramento");
+
+        const currentAddresses = new Set();
+
+        let nextButtonExists = await page.evaluate(() => {
+            const button = document.querySelector('.pagination__button.pagination__button--next-previous');
+            if (button && button.textContent.trim() === 'Next') {
+              button.click();
+              return true; // Button was clicked
+            }
+            return false; // Button was not found or conditions not met
+        });
+
+        let cards = [];
+        do {
+            await page.waitForSelector(".CoveoResult");
+            cards = cards.concat(await page.$$(".CoveoResult"));
+            console.log(cards);
+            nextButtonExists = await page.evaluate(() => {
+                const button = document.querySelector('.pagination__button.pagination__button--next-previous');
+                if (button && button.textContent.trim() === 'Next') {
+                  button.click();
+                  return true; // Button was clicked
+                }
+                return false; // Button was not found or conditions not met
+            });
+        } while (nextButtonExists)
+
+        await delay(30000);
+        
+        let mirLinks = []
+        for (const card of cards) {
+            const mir = await card.$(".home-info__available-homes");
+            if (mir) {
+                const link = await card.$eval(".coveo-list-layout .CoveoResultLink", a => a.href.trim());
+                mirLinks.push(link);
+            }
+        }
+
+        for (const link of mirLinks) {
+            await page.goto(link);
+            await page.waitForSelector(".community-main-info h1");
+
+            const community = await page.$eval(".community-main-info h1", el => el.textContent.trim());
+            const city = await page.$eval(".community-secondary-info a", el => el.textContent.split(",")[1].trim());
+
+            await page.waitForSelector(".related-move-in .toggle-item");
+            const mirCards = await page.$$(".related-move-in .toggle-item");
+
+            for (const mirCard of mirCards) {
+                const address = await mirCard.$eval(".card-content h3", el => el.textContent.trim());
+                currentAddresses.add(address);
+
+                if (!existingAddresses.has(address)) {
+                    const price = await mirCard.$eval(".card-content h2", el => el.textContent.split(" ")[0].replace(/[^0-9]/g, "").trim());
+                    if (price === "") {
+                        continue;
+                    }
+                    const houseDetails = await mirCard.$$eval(".card-content p", details => {
+                        return details.map(detail => detail.textContent.trim());
+                    });
+                    let detailPos;
+                    if (houseDetails.length === 3) {
+                        detailPos = 1
+                    } else {
+                        detailPos = 0
+                    }
+   
+                    const sqFt = houseDetails[detailPos].split("|")[4].replace(/[^0-9]/g, "").trim();
+                    const beds = houseDetails[detailPos].split("|")[0].replace(/[^0-9]/g, "").trim();
+                    const baths = houseDetails[detailPos].split("|")[1].replace(/[^0-9.]/g, "").trim();
+                    const garages = houseDetails[detailPos].split("|")[2].replace(/[^0-9]/g, "").trim();
+                    const imgUrl = await mirCard.evaluate(() => {
+                        const element = document.querySelector('.card-image');
+                        const style = element.style.backgroundImage;
+                        const relativeUrl = style.slice(5, -2); // Remove 'url(' at the start and ')' at the end
+                        const baseUrl = window.location.origin;
+                        return baseUrl + relativeUrl;
+                    });
+                    const webLink = await mirCard.$eval(".CoveoResultLink ", a => a.href.trim());
+
+                    await db.query(`
+                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        ["Dr Horton Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, webLink]
+                    );
+                }
+            }
+        }
+
+        browser.close();
+
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addDrHorton", err);
+    }
+}
 
 export default addHomes;
