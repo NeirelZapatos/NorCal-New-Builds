@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import env from "dotenv";
 import pg from "pg";
 import puppeteer from "puppeteer";
+import { URL } from "url"; 
 
 env.config();
 
@@ -13,6 +14,12 @@ const db = new pg.Pool({
     password: "9kxtEC%M5%^2N92B",
     port: 5432
 });
+
+function delay(time) {
+    return new Promise(function(resolve) { 
+        setTimeout(resolve, time)
+    });
+ }
 
 async function addJmc() {
     console.log("Adding JMC");
@@ -49,11 +56,14 @@ async function addJmc() {
                     const baths = houseDetails[2]?.replace(/[^0-9.]/g, "") || "";
                     const garages = houseDetails[3]?.replace(/[^0-9]/g, "") || "";
                     const imgUrl = $(element).find(".HomeCard_media img").attr("src");
+                    const webLink = $(element).find(".HomeCard_media a").attr("href");
+                    const baseUrl = response.request.res.responseUrl;
+                    const fullUrl = new URL(webLink, baseUrl).href;
 
                     await db.query(
-                        `INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                        ["JMC Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                        `INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        ["JMC Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, fullUrl]
                     );
                 }
             }
@@ -94,11 +104,14 @@ async function addWoodside() {
                 const baths = $(element).find(".panel-home__content-meta-part-1").text().split(" · ")[1].trim().replace(/[^0-9.]/g, "");
                 const garages = $(element).find(".panel-home__content-meta-part-2").text().split("Car")[0].trim().replace(/[^0-9]/g, "");
                 const imgUrl = $(element).find("img").attr("data-url");
+                const webLink = $(element).find(".panel-home__asset a").attr("href");
+                const baseUrl = response.request.res.responseUrl;
+                const fullUrl = new URL(webLink, baseUrl).href;
 
                 await db.query(`
-                    INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                    ["Woodside Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                    INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                    ["Woodside Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, fullUrl]
                 );
             }
         }).get();
@@ -139,11 +152,14 @@ async function addBeazer() {
                 const baths = $(element).find(".stats ul li").eq(4).text().trim().replace(/[^0-9.]/g, "");
                 const garages = -1;
                 const imgUrl = $(element).find("img").attr("src");
+                const webLink = $(element).find("a").attr("href");
+                const baseUrl = response.request.res.responseUrl;
+                const fullUrl = new URL(webLink, baseUrl).href;
 
                 await db.query(`
-                    INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                    ["Beazer Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                    INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                    ["Beazer Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, fullUrl]
                 );
             }
         }).get();
@@ -203,12 +219,13 @@ async function addKb() {
                     const beds = houseDetails[0];
                     const baths = houseDetails[1];
                     const garages = houseDetails[2];
-                    const imgUrl = await mirCard.$eval("img", a => a.src.trim());
+                    const imgUrl = await mirCard.$eval("img", img => img.src.trim());
+                    const webLink = await mirCard.$eval("a", a => a.href.trim());
             
                     await db.query(`
-                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                        ["Kb Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        ["Kb Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, webLink]
                     );
                 }
             } 
@@ -282,12 +299,13 @@ async function addTripointe() {
                 const baths = houseDetails[2];
                 const garages = houseDetails[3];
                 const imgUrl = await card.$eval("img", img => img.src.trim());
+                const webLink = await card.$eval("a.gtm-search-hit__link.tw-text-charcoal", a => a.href.trim());
 
                 try {
                     await db.query(`
-                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                        ["Tripointe Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl]
+                        INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        ["Tripointe Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, webLink]
                     );
                 } catch {
                     break;
@@ -306,6 +324,100 @@ async function addTripointe() {
         console.log("Error in addTripointe", err);
     }
 }
+
+// Sometimes house details is unknown. Need to add a checker that checks if database beds = -1 so I can readd the home into the database
+async function addRichmondAmerican() {
+    console.log("Adding Richmond American");
+    try { 
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Richmond American Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
+
+        const browser = await puppeteer.launch({
+            headless: true,
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            }
+        });
+
+        const page = await browser.newPage();
+        await page.goto("https://www.richmondamerican.com/california/sacramento-new-homes/");
+
+        const currentAddresses = new Set();
+        
+        await delay(5000);
+
+        await page.waitForSelector(".blz-community-filters-open")
+        await page.click(".blz-community-filters-open")
+        
+        await page.waitForSelector('input#ha-next-3-months');
+        await page.$eval('input#ha-next-3-months', checkbox => checkbox.click());
+
+        await page.waitForSelector(".filter--header .btn");
+        await page.$eval(".filter--header .btn", element => element.click());
+
+        await page.waitForSelector(".comm-card__content-wrap");
+        const cards = await page.$$(".comm-card__content-wrap");
+
+        for (const card of cards) {
+            const address = await card.$eval(".comm-card__price-range", element => element.textContent.trim());
+            currentAddresses.add(address);
+
+            if (!existingAddresses.has(address)) {
+                const houseDetails = await card.$$eval(".comm-card__copy p", details => {
+                    return details.map(detail => detail.textContent.trim());
+                });
+
+                const city = await card.$eval(".comm-card__img div .mb-0 a", el => el.href.split("/")[5].replace(/[-]/g, " ").trim());
+                const community = await card.$eval(".comm-card__img div .mb-0 a", el => el.href.split("/")[6].replace(/[-]/g, " ").trim());
+                let sqFt;
+                let baths;
+                let beds;
+                let garages;
+                if (houseDetails[1] === "Information coming soon") {
+                    sqFt = -1;
+                    baths = -1;
+                    beds = -1;
+                    garages = -1;
+                } else {
+                    sqFt = houseDetails[1].replace(/[^0-9]/g, "");
+                    beds = houseDetails[2].replace(/[^0-9]/g, "");
+                    baths = houseDetails[3].replace(/[^0-9.]/g, "");
+                    garages = houseDetails[4].replace(/[^0-9]/g, "");
+                }
+                const priceElement = await card.$(".discounted-price");
+                let price;
+                if (priceElement) {
+                    price = await card.$eval(".discounted-price", el => el.textContent.trim().split(" ")[0].replace(/[^0-9]/g, ""));
+                } else {
+                    price = await card.$eval(".comm-card__header", el => el.textContent.trim().replace(/[^0-9]/g, ""));
+                }
+                const imgUrl = await card.$eval("img", img => img.src.trim());
+                const webLink = await card.$eval(".comm-card__content-wrap a", el => el.href);
+
+                await db.query(`
+                    INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                    ["Richmond American Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, webLink]
+                );
+            }
+        }
+
+        browser.close();
+
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addRichmondAmerican", err);
+    }
+}
+
+async function AddDrHorton() {
+
+}
  
 function addHomes() {
     addJmc();
@@ -313,6 +425,7 @@ function addHomes() {
     addBeazer();
     addKb();
     addTripointe();
+    addRichmondAmerican();
 }
 
 addHomes();
