@@ -10,6 +10,7 @@ function CardHeader(props) {
                 .map(word => {
                         return word === "at" ? word :
                                word === "by" ? word :
+                               word === "@" ? "at" :
                                word.charAt(0).toUpperCase() + word.slice(1);
                 })
                 .join(" ")
