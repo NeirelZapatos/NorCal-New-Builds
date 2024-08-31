@@ -5,13 +5,13 @@ function Information() {
         <section className="py-5 text-center container">
             <div className="row py-lg-5">
             <div className="col-lg-6 col-md-8 mx-auto">
-                <img src="./images/NorCal NewBuild (2) (1).png" alt="Nor Cal New Build logo" />
+                <img src="./images/NorCal NewBuild (2) (1).png" alt="Nor Cal New Build logo" className="mb-2 img-fluid"/>
                 {/* <h1 className="fw-light">Album example</h1> */}
                 <p className="lead text-body-secondary">Something short and leading about the collection below—its contents, the creator, etc. Make it short and sweet, but not too short so folks don’t simply skip over it entirely.</p>
-                <p>
+                {/*<p>
                     <a href="#" className="btn btn-primary my-2">Main call to action</a>
                     <a href="#" className="btn btn-secondary my-2">Secondary action</a>
-                </p>
+                </p>*/}
             </div>
             </div>
         </section>        

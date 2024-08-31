@@ -5,3 +5,17 @@
 .text-bg-dark {
     background-color: rgb(100, 130, 173) !important;
 }
+
+.details {
+    font-size: .75rem;
+}
+
+.btn-primary {
+    border-color: rgb(100, 130, 173) !important;
+    background-color: rgb(100, 130, 173) !important;
+}
+
+.btn-primary:hover {
+    border-color: rgb(70, 100, 140) !important;
+    background-color: rgb(70, 100, 140) !important;
+}
