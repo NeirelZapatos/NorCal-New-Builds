@@ -28,7 +28,8 @@ function addHomes() {
     addDrHorton();
 }
 
-addHomes();
+// addHomes();
+addMeritage();
 
 function delay(time) {
     return new Promise(function(resolve) { 
@@ -85,8 +86,9 @@ async function addJmc() {
         }).get(); // Convert to array
 
         await Promise.all(homePromises);
-        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+        console.log("Finished adding Jmc");
 
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
         if (addressesToDelete.length > 0) {
             await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
         }
@@ -132,8 +134,9 @@ async function addWoodside() {
         }).get();
         
         await Promise.all(homePromises);
-        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+        console.log("Finished adding Woodside");
 
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
         if (addressesToDelete.length > 0) {
             await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
         }
@@ -178,7 +181,9 @@ async function addBeazer() {
                 );
             }
         }).get();
+
         await Promise.all(homePromises);
+        console.log("Finished adding Beazer");
 
         const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
         if (addressesToDelete.length > 0) {
@@ -253,6 +258,7 @@ async function addKb() {
         }
 
         browser.close();
+        console.log("Finished adding Kb");
 
         const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
 
@@ -333,6 +339,7 @@ async function addTripointe() {
         }
 
         browser.close();
+        console.log("Finished adding Tripointe");
 
         const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
 
@@ -425,6 +432,7 @@ async function addRichmondAmerican() {
         }
 
         browser.close();
+        console.log("Finished adding Richmond American");
 
         const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
 
@@ -467,7 +475,6 @@ async function addDrHorton() {
                 break;
             }
         }
-
 
         let mirLinks = []
         for (const card of cards) {
@@ -533,6 +540,7 @@ async function addDrHorton() {
         }
 
         browser.close();
+        console.log("Finished adding Dr Horton");
 
         const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
 
@@ -542,6 +550,82 @@ async function addDrHorton() {
     } catch (err) {
         console.log("Error in addDrHorton", err);
     }
+}
+
+async function addMeritage() {
+    console.log("Adding Meritage");
+    try {
+        const existingAddressResult = await db.query("SELECT address FROM homes WHERE builder = 'Meritage Homes'");
+        const existingAddresses = new Set(existingAddressResult.rows.map(row => row.address));
+
+        const browser = await puppeteer.launch({
+            headless: false,
+            defaultViewport: {
+                width: 1920,
+                height: 1080
+            }
+        });
+
+        const page = await browser.newPage();
+        await page.goto("https://www.meritagehomes.com/state/ca/sacramento/search/qmi/1");
+
+        const distance = 99999999999;
+        let previousHeight;
+        while (true) {
+            previousHeight = await page.evaluate('document.body.scrollHeight');
+            await page.evaluate(`window.scrollBy(0, ${distance});`);
+            await delay(500);
+            const newHeight = await page.evaluate('document.body.scrollHeight');
+            if(newHeight === previousHeight) {
+                break;
+            }
+        }
+        // await page.waitForNetworkIdle();
+
+        const currentAddresses = new Set();
+
+        await page.waitForSelector(".community-horizontal");
+        const mirCards = await page.$$(".community-horizontal");
+
+        for (const mirCard of mirCards) {
+            const address = await mirCard.$eval(".community--name a", el => el.href.split("/")[8].replace(/[-]/g, " "));
+            currentAddresses.add(address);
+
+            if (!existingAddresses.has(address)) {
+                // const houseDetails = await mirCard.$$eval(".font-AvenirNextLTPro-Bold", details => {
+                //     return details.map(detail => detail.textContent);
+                // });
+        
+                const city = await mirCard.$eval(".community--name a", el => el.href.split("/")[5].replace(/[-]/g, " "));
+                const community = await mirCard.$eval(".community--name a", el => el.href.split("/")[6].replace(/[-]/g, " "));
+                console.log(city, community);
+                // const price = await mirCard.$eval(".price", price => price.textContent.replace(/[^0-9]/g, "").trim());
+                // const sqFt = houseDetails[3].replace(/[^0-9]/g, "");
+                // const beds = houseDetails[0];
+                // const baths = houseDetails[1];
+                // const garages = houseDetails[2];
+                // const imgUrl = await mirCard.$eval("img", img => img.src.trim());
+                // const webLink = await mirCard.$eval("a", a => a.href.trim());
+        
+            //     await db.query(`
+            //         INSERT INTO homes (builder, address, city, community, price, sqft, beds, baths, garages, imgurl, weblink)
+            //         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            //         ["Meritage Homes", address, city, community, price, sqFt, beds, baths, garages, imgUrl, webLink]
+            //     );
+            }
+        } 
+
+        browser.close();
+        console.log("Finished adding Meritage");
+
+        const addressesToDelete = Array.from(existingAddresses).filter(address => !currentAddresses.has(address));
+
+        if (addressesToDelete.length > 0) {
+            await db.query("DELETE FROM homes WHERE address = ANY($1)", [addressesToDelete]);
+        }
+    } catch (err) {
+        console.log("Error in addMeritage:", err);
+    } 
 }
 
 export default addHomes;

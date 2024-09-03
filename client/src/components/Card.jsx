@@ -35,8 +35,8 @@ function Card(props) {
                         
                         <div className="d-flex justify-content-between">
                             <button type="button" className="btn btn-primary btn-md w-100 mt-2">View Details</button>
-                            {/* <small className="text-body-secondary">9 mins</small> */}
                         </div>
+                        <small className="text-body-secondary">{props.house.builder}</small>
                     </div>
                 </div>
             </div>
